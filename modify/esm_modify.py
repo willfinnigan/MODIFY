@@ -90,6 +90,13 @@ def create_parser():
     )
 
     parser.add_argument(
+        "--positions",
+        type=int,
+        nargs='+',
+        help="List of positions in the protein sequence to examine"
+    )
+
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=64,
@@ -97,11 +104,19 @@ def create_parser():
     )
 
     parser.add_argument(
-        "--positions",
+        "--gpu-device",
         type=int,
-        nargs='+',
-        help="List of positions in the protein sequence to examine"
+        default=None,
+        help="Specify GPU device to use"
     )
+
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=str,
+        default=None,
+        help="Directory to load or save models to or from"
+    )
+
 
     # fmt: on
     parser.add_argument("--nogpu", action="store_true", help="Do not use GPU even if available")
@@ -139,6 +154,14 @@ def mmp_multi(data):
 
 
 def main(args):
+    if args.gpu_device is not None:
+        print(f"Using GPU {args.gpu_device}")
+        torch.cuda.set_device(args.gpu_device)
+
+    if args.checkpoint_dir is not None:
+        print(f"Setting torch hub dir to {args.checkpoint_dir}")
+        torch.hub.set_dir(args.checkpoint_dir)
+
     if args.protein == 'GB1':
         positions = [39, 40, 41, 54]
 
@@ -158,10 +181,11 @@ def main(args):
 
     tot = len(df)
     batch_size = args.batch_size
+    num_batches = int(tot / batch_size)
 
     # inference for each model
     for model_location in args.model_location:
-        print(f"Loading model {model_location}..")
+        print(f"Loading model {model_location}")
 
         if model_location[3] == '1' or model_location[3] == '_':
             model, alphabet = pretrained.load_model_and_alphabet(model_location)
@@ -169,7 +193,7 @@ def main(args):
             model, alphabet = esm.pretrained.esm2_t36_3B_UR50D()
         model.eval()
         model = model.cuda()
-        print('model ready')
+        print('model loaded')
 
         batch_converter = alphabet.get_batch_converter()
 
